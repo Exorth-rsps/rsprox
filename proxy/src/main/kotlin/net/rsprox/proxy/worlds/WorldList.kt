@@ -2,7 +2,7 @@ package net.rsprox.proxy.worlds
 
 import io.netty.buffer.ByteBufAllocator
 import io.netty.buffer.Unpooled
-import mu.KotlinLogging
+import com.github.michaelbull.logging.InlineLogger
 import net.rsprot.buffer.JagByteBuf
 import net.rsprot.buffer.extensions.toJagByteBuf
 import net.rsprox.proxy.target.ProxyTargetConfig
@@ -165,6 +165,6 @@ public data class WorldList(
                 world.activity.length
         }
 
-        private val logger = KotlinLogging.logger {}
+        private val logger = InlineLogger()
     }
 }
