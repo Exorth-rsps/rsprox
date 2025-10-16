@@ -2,6 +2,7 @@ package net.rsprox.proxy.worlds
 
 import io.netty.buffer.ByteBufAllocator
 import io.netty.buffer.Unpooled
+import com.github.michaelbull.logging.InlineLogger
 import net.rsprot.buffer.JagByteBuf
 import net.rsprot.buffer.extensions.toJagByteBuf
 import net.rsprox.proxy.target.ProxyTargetConfig
@@ -113,6 +114,8 @@ public data class WorldList(
             buffer: JagByteBuf,
         ): List<World> {
             val payloadSize = buffer.g4()
+            val payloadStartIndex = buffer.readerIndex()
+            val expectedPayloadEnd = payloadStartIndex + payloadSize
             val count = buffer.g2()
             val worldList =
                 buildList {
@@ -126,8 +129,27 @@ public data class WorldList(
                         add(World(config, id, properties, population, location, host, activity))
                     }
                 }
-            check(buffer.readerIndex() == payloadSize + Int.SIZE_BYTES) {
-                "World list format invalid"
+            val actualReaderIndex = buffer.readerIndex()
+            when {
+                actualReaderIndex == expectedPayloadEnd -> {
+                    // Expected state, no-op.
+                }
+                actualReaderIndex < expectedPayloadEnd -> {
+                    val unreadBytes = expectedPayloadEnd - actualReaderIndex
+                    logger.debug {
+                        "World list payload declared $payloadSize bytes but $unreadBytes bytes were left unread; skipping trailing data"
+                    }
+                    if (expectedPayloadEnd <= buffer.writerIndex()) {
+                        buffer.readerIndex(expectedPayloadEnd)
+                    } else {
+                        logger.warn {
+                            "World list payload declared $payloadSize bytes but only ${buffer.writerIndex() - payloadStartIndex} bytes were available"
+                        }
+                    }
+                }
+                else -> {
+                    throw IllegalStateException("World list format invalid (read past payload)")
+                }
             }
             return worldList
         }
@@ -142,5 +164,7 @@ public data class WorldList(
                 world.localHostAddress.toString().length +
                 world.activity.length
         }
+
+        private val logger = InlineLogger()
     }
 }
